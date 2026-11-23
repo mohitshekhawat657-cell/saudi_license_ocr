@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environment
+venv/
+.env.example
+
+# Mac
+.DS_Store
+
+# Logs
+*.log
+
+# Database
+*.db
+
+
+# Build files
+dist/
+build/
+
+
+results/
+json_response/
+scripts/
+uploads/
+received_webhooks/
+
+test_concurrent.py
+webhook_receiver.py
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+dataset/
+raw_images/
+raw_labels/
+runs/
+# Virtual Environment
+venv/
+.env.example
+
+# Mac
+.DS_Store
+
+# Logs
+*.log
+
+# Database
+*.db
+
+
+
+# Build files
+dist/
+build/
+
+
+results/
+json_response/
+scripts/
+uploads/
+received_webhooks/
+
+test_concurrent.py
+webhook_receiver.py

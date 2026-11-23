@@ -1,0 +1,403 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Saudi Driving License Verification API",
+    "description": "Full Postman collection for the Saudi Driving License Verification API.\n\nBase URL is stored in the `base_url` collection variable — change it once to target any environment.\n\nEndpoints:\n  GET  /              — Liveness ping\n  GET  /health        — YOLO + VLM backend status\n  POST /verify        — Single image verification\n  POST /verify-batch  — Batch image verification (up to 2000 files)\n\nHow to use:\n  1. Start the API:  uvicorn api:app --host 0.0.0.0 --port 8000\n  2. Set the `base_url` variable (default: http://localhost:8000)\n  3. Run Health first to confirm everything is ready\n  4. Use Verify or Verify Batch for license extraction",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string",
+      "description": "Change this to your server address, e.g. http://192.168.1.10:8000"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "description": "Liveness and readiness checks",
+      "item": [
+        {
+          "name": "Root — Liveness Ping",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "Simple liveness check. Returns 200 if the API process is running."
+          },
+          "response": [
+            {
+              "name": "200 OK — API is running",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": { "raw": "{{base_url}}/", "host": ["{{base_url}}"], "path": [""] }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": \"ok\",\n  \"service\": \"Saudi Driving License Verification API\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Health — YOLO + VLM Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Checks:\n- YOLO model is found on disk\n- Ollama server is reachable\n- Target VLM model is loaded in Ollama\n\nReturns `status: ok` when everything is ready, `status: degraded` if the YOLO model is missing."
+          },
+          "response": [
+            {
+              "name": "200 OK — All systems ready",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": \"ok\",\n  \"yolo_model\": {\n    \"found\": true,\n    \"path\": \"runs/train/license_detector/weights/best.pt\"\n  },\n  \"vlm\": {\n    \"backend\": \"ollama\",\n    \"healthy\": true,\n    \"model_loaded\": true,\n    \"model\": \"qwen2.5vl:7b\"\n  }\n}"
+            },
+            {
+              "name": "200 Degraded — YOLO model missing",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": \"degraded\",\n  \"yolo_model\": {\n    \"found\": false,\n    \"path\": null\n  },\n  \"vlm\": {\n    \"backend\": \"ollama\",\n    \"healthy\": true,\n    \"model_loaded\": true\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Verification",
+      "description": "License image verification endpoints",
+      "item": [
+        {
+          "name": "Verify — Single License Image",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200 or 422\", function () {",
+                  "    pm.expect([200, 422, 500, 503]).to.include(pm.response.code);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"Response has success field\", function () {",
+                  "        var body = pm.response.json();",
+                  "        pm.expect(body).to.have.property('success');",
+                  "        pm.expect(body.success).to.be.true;",
+                  "    });",
+                  "    pm.test(\"License data is present\", function () {",
+                  "        var body = pm.response.json();",
+                  "        pm.expect(body).to.have.property('license_data');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "type",
+                  "value": "driving_license",
+                  "type": "text",
+                  "description": "Document type identifier (required)"
+                },
+                {
+                  "key": "id",
+                  "value": "user_001",
+                  "type": "text",
+                  "description": "Your reference or user ID — echoed back in the response (required)"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "License image — supported: jpg, jpeg, png, webp, heic, tiff, bmp, gif, pdf (required)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/verify",
+              "host": ["{{base_url}}"],
+              "path": ["verify"]
+            },
+            "description": "Verify a single Saudi driving license image.\n\n**Internal pipeline:**\n1. Validate file extension\n2. YOLO detection → locate license in image (≥ 0.70 confidence required)\n3. Crop license region (+ 15 px padding)\n4. Pre-process: resize to 1200 px wide, sharpen\n5. VLM OCR via Ollama (qwen2.5vl:7b) → extract text fields\n6. Post-process: normalise dates, trim strings\n7. Validation: check required fields, date formats, expiry status\n\n**Supported file types:** jpg · jpeg · png · webp · heic · tiff · bmp · gif · pdf\n\n**Returns:**\n- `200` — success with full `license_data` and `validation` blocks\n- `422` — bad image extension or no license detected\n- `500` — OCR pipeline error\n- `503` — YOLO model not found on server"
+          },
+          "response": [
+            {
+              "name": "200 OK — License extracted successfully",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    { "key": "type", "value": "driving_license", "type": "text" },
+                    { "key": "id",   "value": "user_001",         "type": "text" },
+                    { "key": "file", "type": "file", "src": [] }
+                  ]
+                },
+                "url": { "raw": "{{base_url}}/verify", "host": ["{{base_url}}"], "path": ["verify"] }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"id\": \"user_001\",\n  \"type\": \"driving_license\",\n  \"request_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"detection_confidence\": 0.9821,\n  \"license_data\": {\n    \"license_number\": \"1037582846\",\n    \"full_name_english\": \"ABDULLAH ALI S ALQARNI\",\n    \"full_name_arabic\": \"عبدالله بن علي بن سعد القرني\",\n    \"date_of_birth\": \"20/07/1974\",\n    \"date_of_issue\": \"17/04/1999\",\n    \"date_of_expiry\": \"01/04/2033\",\n    \"category\": \"PRIVATE\",\n    \"nationality\": \"SAUDI\",\n    \"blood_group\": \"A+\",\n    \"restrictions\": \"3\",\n    \"version\": \"3\",\n    \"issuing_country\": \"Saudi Arabia\"\n  },\n  \"validation\": {\n    \"valid\": true,\n    \"issues\": [],\n    \"warnings\": []\n  },\n  \"duration_ms\": 4312.5\n}"
+            },
+            {
+              "name": "200 OK — License valid but expiring soon (warning)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    { "key": "type", "value": "driving_license", "type": "text" },
+                    { "key": "id",   "value": "user_001",         "type": "text" },
+                    { "key": "file", "type": "file", "src": [] }
+                  ]
+                },
+                "url": { "raw": "{{base_url}}/verify", "host": ["{{base_url}}"], "path": ["verify"] }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"id\": \"user_001\",\n  \"type\": \"driving_license\",\n  \"request_id\": \"550e8400-e29b-41d4-a716-446655440001\",\n  \"detection_confidence\": 0.9134,\n  \"license_data\": {\n    \"license_number\": \"2049183745\",\n    \"full_name_english\": \"MOHAMMED SAEED AL ZAHRANI\",\n    \"full_name_arabic\": \"محمد سعيد الزهراني\",\n    \"date_of_birth\": \"05/03/1990\",\n    \"date_of_issue\": \"12/08/2015\",\n    \"date_of_expiry\": \"12/04/2026\",\n    \"category\": \"PRIVATE\",\n    \"nationality\": \"SAUDI\",\n    \"blood_group\": \"O+\",\n    \"restrictions\": null,\n    \"version\": \"2\",\n    \"issuing_country\": \"Saudi Arabia\"\n  },\n  \"validation\": {\n    \"valid\": true,\n    \"issues\": [],\n    \"warnings\": [\"License expires within 30 days (12/04/2026)\"]\n  },\n  \"duration_ms\": 3721.0\n}"
+            },
+            {
+              "name": "200 OK — License expired (validation failed)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    { "key": "type", "value": "driving_license", "type": "text" },
+                    { "key": "id",   "value": "user_001",         "type": "text" },
+                    { "key": "file", "type": "file", "src": [] }
+                  ]
+                },
+                "url": { "raw": "{{base_url}}/verify", "host": ["{{base_url}}"], "path": ["verify"] }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"id\": \"user_001\",\n  \"type\": \"driving_license\",\n  \"request_id\": \"550e8400-e29b-41d4-a716-446655440002\",\n  \"detection_confidence\": 0.9612,\n  \"license_data\": {\n    \"license_number\": \"3081927456\",\n    \"full_name_english\": \"KHALID OMAR AL HARBI\",\n    \"full_name_arabic\": \"خالد عمر الحربي\",\n    \"date_of_birth\": \"12/11/1985\",\n    \"date_of_issue\": \"01/06/2010\",\n    \"date_of_expiry\": \"01/06/2020\",\n    \"category\": \"PRIVATE\",\n    \"nationality\": \"SAUDI\",\n    \"blood_group\": \"B+\",\n    \"restrictions\": null,\n    \"version\": \"2\",\n    \"issuing_country\": \"Saudi Arabia\"\n  },\n  \"validation\": {\n    \"valid\": false,\n    \"issues\": [\"License expired on 01/06/2020\"],\n    \"warnings\": []\n  },\n  \"duration_ms\": 3987.2\n}"
+            },
+            {
+              "name": "422 — No license detected in image",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    { "key": "type", "value": "driving_license", "type": "text" },
+                    { "key": "id",   "value": "user_001",         "type": "text" },
+                    { "key": "file", "type": "file", "src": [] }
+                  ]
+                },
+                "url": { "raw": "{{base_url}}/verify", "host": ["{{base_url}}"], "path": ["verify"] }
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"id\": \"user_001\",\n  \"type\": \"driving_license\",\n  \"request_id\": \"550e8400-e29b-41d4-a716-446655440003\",\n  \"stage\": \"detection\",\n  \"error\": \"No license card detected. Upload a clear photo of the front of your Saudi driving license.\",\n  \"duration_ms\": 230.1\n}"
+            },
+            {
+              "name": "422 — Unsupported file type",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    { "key": "type", "value": "driving_license", "type": "text" },
+                    { "key": "id",   "value": "user_001",         "type": "text" },
+                    { "key": "file", "type": "file", "src": [] }
+                  ]
+                },
+                "url": { "raw": "{{base_url}}/verify", "host": ["{{base_url}}"], "path": ["verify"] }
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"id\": \"user_001\",\n  \"type\": \"driving_license\",\n  \"error\": \"Unsupported file type '.docx'. Allowed: ['.bmp', '.gif', '.heic', '.jpg', '.jpeg', '.pdf', '.png', '.tiff', '.webp']\"\n}"
+            },
+            {
+              "name": "503 — YOLO model not found on server",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    { "key": "type", "value": "driving_license", "type": "text" },
+                    { "key": "id",   "value": "user_001",         "type": "text" },
+                    { "key": "file", "type": "file", "src": [] }
+                  ]
+                },
+                "url": { "raw": "{{base_url}}/verify", "host": ["{{base_url}}"], "path": ["verify"] }
+              },
+              "status": "Service Unavailable",
+              "code": 503,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"detail\": {\n    \"success\": false,\n    \"error\": \"YOLO model not found. Run 'python train.py' to train it, or set YOLO_MODEL_PATH in .env\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Verify Batch — Multiple License Images (up to 2000)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has results array\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('results');",
+                  "    pm.expect(body.results).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test(\"Total equals results array length\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.results.length).to.equal(body.total);",
+                  "});",
+                  "",
+                  "pm.test(\"Succeeded + failed = total\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.succeeded + body.failed).to.equal(body.total);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "type",
+                  "value": "driving_license",
+                  "type": "text",
+                  "description": "Document type applied to all images in this batch (required)"
+                },
+                {
+                  "key": "id",
+                  "value": "batch_run_001",
+                  "type": "text",
+                  "description": "Your batch reference ID — echoed in the response (required)"
+                },
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": [],
+                  "description": "Image file #1 — add as many 'files' rows as needed (up to 2000)"
+                },
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": [],
+                  "description": "Image file #2 — duplicate this row for each additional image"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/verify-batch",
+              "host": ["{{base_url}}"],
+              "path": ["verify-batch"]
+            },
+            "description": "Verify 1–2000 license images in a single HTTP request.\n\n**How to send many files in Postman:**\n1. In the Body tab, select `form-data`\n2. Add a row: Key = `files`, Type = `File`, select your image\n3. To add more images: duplicate the row (click ⋯ → Duplicate)\n   Each row must have Key = `files`\n\n**Response format:**\n```json\n{\n  \"success\": true,\n  \"batch_id\": \"uuid\",\n  \"total\": N,\n  \"succeeded\": X,\n  \"failed\": Y,\n  \"results\": [ ... ]   ← flat array, one entry per image\n}\n```\n\nResults are in the same order as the uploaded files. Each entry has its own `success` flag — mixed success/failure is normal.\n\n**Server-side limit:** 2000 files per request (set `BATCH_MAX_FILES` env var to change)."
+          },
+          "response": [
+            {
+              "name": "200 OK — Batch complete (mixed success/failure)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    { "key": "type",  "value": "driving_license", "type": "text" },
+                    { "key": "id",    "value": "batch_run_001",    "type": "text" },
+                    { "key": "files", "type": "file", "src": [] },
+                    { "key": "files", "type": "file", "src": [] }
+                  ]
+                },
+                "url": { "raw": "{{base_url}}/verify-batch", "host": ["{{base_url}}"], "path": ["verify-batch"] }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"batch_id\": \"7c9e6679-7425-40de-944b-e07fc1f90ae7\",\n  \"id\": \"batch_run_001\",\n  \"type\": \"driving_license\",\n  \"total\": 2,\n  \"succeeded\": 1,\n  \"failed\": 1,\n  \"results\": [\n    {\n      \"index\": 0,\n      \"filename\": \"license1.jpg\",\n      \"success\": true,\n      \"detection_confidence\": 0.9821,\n      \"license_data\": {\n        \"license_number\": \"1037582846\",\n        \"full_name_english\": \"ABDULLAH ALI S ALQARNI\",\n        \"full_name_arabic\": \"عبدالله بن علي بن سعد القرني\",\n        \"date_of_birth\": \"20/07/1974\",\n        \"date_of_issue\": \"17/04/1999\",\n        \"date_of_expiry\": \"01/04/2033\",\n        \"category\": \"PRIVATE\",\n        \"nationality\": \"SAUDI\",\n        \"blood_group\": \"A+\",\n        \"restrictions\": \"3\",\n        \"version\": \"3\",\n        \"issuing_country\": \"Saudi Arabia\"\n      },\n      \"validation\": {\n        \"valid\": true,\n        \"issues\": [],\n        \"warnings\": []\n      },\n      \"duration_ms\": 4312.5\n    },\n    {\n      \"index\": 1,\n      \"filename\": \"blurry_photo.jpg\",\n      \"success\": false,\n      \"stage\": \"detection\",\n      \"error\": \"No license card detected. Upload a clear photo of the front of your Saudi driving license.\",\n      \"duration_ms\": 215.8\n    }\n  ]\n}"
+            },
+            {
+              "name": "422 — Too many files (over 2000 limit)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    { "key": "type",  "value": "driving_license", "type": "text" },
+                    { "key": "id",    "value": "batch_run_001",    "type": "text" }
+                  ]
+                },
+                "url": { "raw": "{{base_url}}/verify-batch", "host": ["{{base_url}}"], "path": ["verify-batch"] }
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"detail\": {\n    \"success\": false,\n    \"error\": \"Too many files: 2500 > limit 2000\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
